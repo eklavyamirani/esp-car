@@ -4,14 +4,6 @@
 
 static const char *TAG = "MOTOR_DRV";
 
-// I2C / PCA9685 configuration matching the Freenove 4WD board
-#define MOTOR_I2C_PORT      I2C_NUM_0
-#define MOTOR_SDA_GPIO      13
-#define MOTOR_SCL_GPIO      14
-#define MOTOR_PCA9685_ADDR  0x5F
-#define MOTOR_I2C_FREQ      100000   // 100 kHz
-#define MOTOR_PWM_FREQ      50       // Hz
-
 // PCA9685 channels for each motor (IN1 = forward, IN2 = reverse)
 #define M1_IN1  15
 #define M1_IN2  14
@@ -31,7 +23,7 @@ static const char *TAG = "MOTOR_DRV";
 #define MOTOR_3_DIR  1
 #define MOTOR_4_DIR  1
 
-static pca9685_handle_t s_pca;
+static pca9685_handle_t *s_pca;
 
 static int clamp(int val, int lo, int hi)
 {
@@ -44,40 +36,21 @@ static esp_err_t set_motor(uint8_t ch_fwd, uint8_t ch_rev, int speed)
 {
     esp_err_t err;
     if (speed >= 0) {
-        err = pca9685_set_channel_pwm(&s_pca, ch_fwd, (uint16_t)speed);
+        err = pca9685_set_channel_pwm(s_pca, ch_fwd, (uint16_t)speed);
         if (err != ESP_OK) return err;
-        return pca9685_set_channel_pwm(&s_pca, ch_rev, 0);
+        return pca9685_set_channel_pwm(s_pca, ch_rev, 0);
     } else {
         speed = -speed;
-        err = pca9685_set_channel_pwm(&s_pca, ch_fwd, 0);
+        err = pca9685_set_channel_pwm(s_pca, ch_fwd, 0);
         if (err != ESP_OK) return err;
-        return pca9685_set_channel_pwm(&s_pca, ch_rev, (uint16_t)speed);
+        return pca9685_set_channel_pwm(s_pca, ch_rev, (uint16_t)speed);
     }
 }
 
-esp_err_t motor_init(void)
+esp_err_t motor_init(pca9685_handle_t *pca)
 {
-    pca9685_config_t cfg = {
-        .i2c_port = MOTOR_I2C_PORT,
-        .sda_gpio = MOTOR_SDA_GPIO,
-        .scl_gpio = MOTOR_SCL_GPIO,
-        .address = MOTOR_PCA9685_ADDR,
-        .i2c_freq_hz = MOTOR_I2C_FREQ,
-    };
-
-    esp_err_t err = pca9685_init(&cfg, &s_pca);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "PCA9685 init failed: %s", esp_err_to_name(err));
-        return err;
-    }
-
-    err = pca9685_set_frequency(&s_pca, MOTOR_PWM_FREQ);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "PCA9685 set frequency failed: %s", esp_err_to_name(err));
-        return err;
-    }
-
-    // Start with motors stopped
+    s_pca = pca;
+    ESP_LOGI(TAG, "Motor driver attached to PCA9685");
     return motor_stop();
 }
 

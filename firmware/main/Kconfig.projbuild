@@ -1,0 +1,8 @@
+menu "ESP Car"
+    config MOTORS_ENABLED
+        bool "Enable motor control"
+        default n
+        help
+            Enable the motor driver and demo task.
+            Disable to save battery during servo testing.
+endmenu

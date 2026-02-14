@@ -1,5 +1,6 @@
 #include "pca9685.h"
 #include "esp_log.h"
+#include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <math.h>
@@ -70,6 +71,10 @@ esp_err_t pca9685_init(const pca9685_config_t *cfg, pca9685_handle_t *handle)
 {
     handle->port = cfg->i2c_port;
     handle->address = cfg->address;
+
+    // Release SDA/SCL from any boot-time peripheral (e.g. JTAG on GPIO 13/14)
+    gpio_reset_pin(cfg->sda_gpio);
+    gpio_reset_pin(cfg->scl_gpio);
 
     // Configure I2C bus using legacy driver
     i2c_config_t i2c_cfg = {

@@ -10,7 +10,7 @@ ESP-IDF firmware for the [Freenove 4WD Car Kit for ESP32](http://www.freenove.co
 | Motor driver | PCA9685 (16-ch I2C PWM), address `0x5F` |
 | I2C bus | SDA = GPIO 13, SCL = GPIO 14, 100 kHz |
 | Motors | 4× DC motors via H-bridge, PCA9685 channels 8–15 |
-| Servos | Pan (ch 0), Tilt (ch 1) — *not yet implemented* |
+| Servos | Pan (ch 0), Tilt (ch 1) — PCA9685 channels, 50 Hz PWM |
 | Camera | OV2640 — *not yet implemented* |
 | Sensors | Ultrasonic, photosensitive, IR, line tracking — *not yet implemented* |
 
@@ -33,11 +33,15 @@ firmware/
 ├── sdkconfig.defaults            # ESP32, 240 MHz, 4 MB flash
 ├── main/
 │   ├── CMakeLists.txt
-│   └── main.c                    # app_main — launches motor demo task
+│   ├── Kconfig.projbuild         # Project config (enable/disable motors)
+│   └── main.c                    # app_main — PCA9685 init, servo + motor demos
 ├── components/
 │   ├── pca9685/                  # PCA9685 I2C PWM driver
 │   │   ├── include/pca9685.h
 │   │   └── pca9685.c
+│   ├── servo/                    # Servo abstraction (angle → PWM)
+│   │   ├── include/servo.h
+│   │   └── servo.c
 │   └── motor/                    # 4-motor abstraction layer
 │       ├── include/motor.h
 │       └── motor.c
@@ -105,7 +109,7 @@ esp_err_t pca9685_set_channel_pwm(pca9685_handle_t *handle, uint8_t channel, uin
 esp_err_t pca9685_set_channel_off(pca9685_handle_t *handle, uint8_t channel);
 ```
 
-Uses the ESP-IDF legacy I2C driver (`driver/i2c.h`) for compatibility with the Freenove board's GPIO 13/14 pin assignment (these pins are reserved by the SPI flash subsystem at boot; the legacy driver handles this transparently).
+Uses the ESP-IDF legacy I2C driver (`driver/i2c.h`) for compatibility with the Freenove board's GPIO 13/14 pin assignment. These pins double as JTAG (MTCK/MTMS) and are held low after boot; `pca9685_init()` calls `gpio_reset_pin()` to release them before configuring I2C. See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for details.
 
 ### `motor`
 
@@ -114,30 +118,53 @@ High-level 4-motor abstraction built on the `pca9685` component.
 **API:**
 
 ```c
-esp_err_t motor_init(void);                              // Init I2C + PCA9685 + stop all motors
+esp_err_t motor_init(pca9685_handle_t *pca);             // Attach to a shared PCA9685 + stop all motors
 esp_err_t motor_move(int m1, int m2, int m3, int m4);   // Set speed per motor (−4095 to +4095)
 esp_err_t motor_stop(void);                              // Stop all motors
 ```
 
 Direction multipliers (`MOTOR_x_DIR`) can be changed to `-1` in `motor.c` if a motor is wired in reverse.
 
-## Current Behavior (Milestone 1)
+### `servo`
 
-On boot, `app_main` initializes the motor subsystem and launches a FreeRTOS task that loops:
+Servo abstraction built on the `pca9685` component. Converts angles (0–180°) to pulse widths.
 
+**API:**
+
+```c
+esp_err_t servo_init(const servo_config_t *cfg, servo_handle_t *handle);
+esp_err_t servo_set_angle(servo_handle_t *handle, float angle);      // 0–180°
+esp_err_t servo_set_pulse_us(servo_handle_t *handle, uint16_t us);   // raw pulse width
 ```
-FORWARD (1s) → STOP (1s) → BACKWARD (1s) → STOP (1s) →
-TURN_LEFT (1s) → STOP (1s) → TURN_RIGHT (1s) → STOP (1s) → repeat
-```
 
-Each state transition is logged via `ESP_LOGI` with tag `MOTOR` for automated verification.
+Default pulse range: 500–2500 µs (configurable via `servo_config_t`).
+
+## Configuration
+
+Run `idf.py menuconfig` → **ESP Car** to toggle:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `CONFIG_MOTORS_ENABLED` | off | Enable motor driver and demo task. Disable to save battery during servo testing. |
+
+## Current Behavior (Milestone 2)
+
+On boot, `app_main` initializes the PCA9685 (shared by servos and motors), then:
+
+1. **Servos** — centers pan and tilt to 90°, then launches a sweep demo:
+   ```
+   PAN=0 TILT=0 → PAN=90 TILT=90 → PAN=180 TILT=180 → PAN=90 TILT=90 → repeat
+   ```
+2. **Motors** (if `CONFIG_MOTORS_ENABLED`) — same demo as Milestone 1.
+
+Each state transition is logged via `ESP_LOGI` with tag `MAIN` for automated verification.
 
 ## Roadmap
 
 | Milestone | Feature | Status |
 |-----------|---------|--------|
 | 1 | Motor control (4WD demo loop) | ✅ Complete |
-| 2 | Servo control (pan/tilt camera mount) | Planned |
+| 2 | Servo control (pan/tilt camera mount) | ✅ Complete |
 | 3 | Ultrasonic sensor + obstacle avoidance | Planned |
 | 4 | Wi-Fi + TCP command server | Planned |
 | 5 | Camera streaming (OV2640) | Planned |

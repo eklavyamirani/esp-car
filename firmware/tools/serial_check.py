@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read serial output from ESP32 and verify the expected motor demo log sequence."""
+"""Read serial output from ESP32 and verify the expected servo demo log sequence."""
 
 import sys
 import time
@@ -10,14 +10,10 @@ BAUD = 115200
 TIMEOUT_S = 20
 
 EXPECTED_SEQUENCE = [
-    "FORWARD",
-    "STOP",
-    "BACKWARD",
-    "STOP",
-    "TURN_LEFT",
-    "STOP",
-    "TURN_RIGHT",
-    "STOP",
+    "SERVO: PAN=0 TILT=0",
+    "SERVO: PAN=90 TILT=90",
+    "SERVO: PAN=180 TILT=180",
+    "SERVO: PAN=90 TILT=90",
 ]
 
 def main():
@@ -56,14 +52,14 @@ def main():
             print(f"  > {line}")
             # Check if this line contains the next expected token
             expected = EXPECTED_SEQUENCE[seq_idx]
-            if f"MOTOR: {expected}" in line:
+            if f"MAIN: {expected}" in line:
                 seq_idx += 1
 
     ser.close()
 
     print()
     if seq_idx >= len(EXPECTED_SEQUENCE):
-        print("✅ PASS — Full motor demo sequence detected")
+        print("✅ PASS — Full servo demo sequence detected")
         return 0
     else:
         matched = EXPECTED_SEQUENCE[:seq_idx]
