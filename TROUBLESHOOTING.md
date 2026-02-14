@@ -16,6 +16,51 @@ W (277) i2c.common: GPIO 14 is not usable, maybe conflict with others
 
 **Resolution:** This warning is **non-fatal** — the I2C driver proceeds and configures the pins correctly. No action needed. The warning can be suppressed by setting the log level for `i2c.common` to `ERROR`, but it's harmless to leave it.
 
+### GPIO 13/14 held low by JTAG peripheral (I2C bus dead)
+
+**Symptom:** I2C bus scan finds zero devices. Checking raw GPIO levels shows both SDA (GPIO 13) and SCL (GPIO 14) stuck at 0 even with internal pull-ups enabled:
+
+```
+I (286) I2C_DIAG: GPIO levels (internal pullup only): SDA=0 SCL=0
+```
+
+All I2C transactions fail with `ESP_ERR_TIMEOUT`. The hardware is known-good (Arduino reference firmware works).
+
+**Cause:** GPIO 13 and GPIO 14 are the ESP32 JTAG pins **MTCK** and **MTMS** respectively. After boot, the JTAG peripheral may continue to drive these pins low. The legacy I2C driver's `i2c_param_config()` routes the I2C signals through the GPIO matrix but does not disconnect the pins from the JTAG peripheral first. Since JTAG actively holds the lines low, the I2C pull-ups (internal or external) cannot pull SDA/SCL high, and no communication is possible.
+
+This does not occur with the Arduino framework because its `Wire.begin()` calls `gpio_set_direction()` through a code path that disconnects the JTAG function before configuring I2C.
+
+**Fix:** Call `gpio_reset_pin()` on both SDA and SCL **before** `i2c_param_config()`:
+
+```c
+#include "driver/gpio.h"
+
+gpio_reset_pin(SDA_GPIO);  // Disconnect GPIO 13 from JTAG (MTCK)
+gpio_reset_pin(SCL_GPIO);  // Disconnect GPIO 14 from JTAG (MTMS)
+
+// Now configure I2C normally
+i2c_param_config(port, &cfg);
+i2c_driver_install(port, I2C_MODE_MASTER, 0, 0, 0);
+```
+
+`gpio_reset_pin()` calls `esp_rom_gpio_pad_select_gpio()` internally, which routes the pin through the GPIO matrix and disconnects it from any peripheral (JTAG, SPI, etc.).
+
+**How to diagnose:** If I2C fails and the battery/hardware is confirmed working:
+
+1. **Check GPIO levels** — configure GPIO 13/14 as inputs with pull-ups and read them. Both should read 1. If either reads 0, a peripheral is holding the line low.
+
+2. **Run an I2C bus scan** — scan addresses 0x03–0x7F. If zero devices are found on a known-good board, the bus itself is non-functional (not an address mismatch).
+
+```c
+// Quick GPIO level check
+gpio_set_direction(SDA_GPIO, GPIO_MODE_INPUT);
+gpio_set_direction(SCL_GPIO, GPIO_MODE_INPUT);
+gpio_set_pull_mode(SDA_GPIO, GPIO_PULLUP_ONLY);
+gpio_set_pull_mode(SCL_GPIO, GPIO_PULLUP_ONLY);
+vTaskDelay(pdMS_TO_TICKS(10));
+ESP_LOGI(TAG, "SDA=%d SCL=%d", gpio_get_level(SDA_GPIO), gpio_get_level(SCL_GPIO));
+```
+
 ### "I2C software timeout" / "I2C hardware timeout detected"
 
 **Symptom:** I2C transactions fail with `ESP_ERR_TIMEOUT`:
@@ -46,7 +91,7 @@ E (293) i2c.master: probe device timeout. Please check if xfer_timeout_ms and pu
 
 The legacy driver (`i2c_param_config` + `i2c_driver_install`) handles this case transparently because it configures the GPIO matrix directly without going through the reservation system.
 
-**Resolution:** Use the legacy I2C driver. It produces a deprecation warning (`This driver is an old driver, please migrate your application code to adapt driver/i2c_master.h`) which is safe to ignore. If a future ESP-IDF version removes the legacy driver, revisit by calling `esp_gpio_revoke()` before `i2c_new_master_bus()`.
+**Resolution:** Use the legacy I2C driver. It produces a deprecation warning (`This driver is an old driver, please migrate your application code to adapt driver/i2c_master.h`) which is safe to ignore. Additionally, call `gpio_reset_pin()` on SDA/SCL before `i2c_param_config()` to release the pins from the JTAG peripheral (see [GPIO 13/14 held low by JTAG peripheral](#gpio-1314-held-low-by-jtag-peripheral-i2c-bus-dead) above). If a future ESP-IDF version removes the legacy driver, revisit by calling `esp_gpio_revoke()` before `i2c_new_master_bus()`.
 
 ## PCA9685 Issues
 

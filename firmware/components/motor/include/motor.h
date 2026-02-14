@@ -1,11 +1,12 @@
 #pragma once
 
 #include "esp_err.h"
+#include "pca9685.h"
 
 /**
- * @brief Initialize the motor subsystem (I2C + PCA9685).
+ * @brief Initialize the motor subsystem using an already-initialized PCA9685.
  */
-esp_err_t motor_init(void);
+esp_err_t motor_init(pca9685_handle_t *pca);
 
 /**
  * @brief Set speed for all 4 motors individually.
