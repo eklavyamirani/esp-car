@@ -6,6 +6,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PORT="${1:-/dev/ttyUSB0}"
 
+# shellcheck source=/dev/null
 source /opt/esp-idf/export.sh 2>/dev/null
 
 cd "$SCRIPT_DIR"

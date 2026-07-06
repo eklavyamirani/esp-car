@@ -1,0 +1,87 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'firmware/**'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    paths:
+      - 'firmware/**'
+      - '.github/workflows/ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: espressif/idf:v5.4.4
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      IDF_CCACHE_ENABLE: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-idf-v5.4.4-${{ github.sha }}
+          restore-keys: |
+            ccache-idf-v5.4.4-
+
+      - name: Build firmware
+        working-directory: firmware
+        shell: bash
+        run: |
+          . "$IDF_PATH/export.sh"
+          idf.py build
+          {
+            echo '### Firmware size (esp-car @ IDF v5.4.4)'
+            echo '```'
+            idf.py size-components | sed -e 's/\x1b\[[0-9;]*m//g'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ github.sha }}
+          path: |
+            firmware/build/esp-car.bin
+            firmware/build/esp-car.elf
+            firmware/build/*.map
+            firmware/build/bootloader/bootloader.bin
+            firmware/build/partition_table/partition-table.bin
+          retention-days: 7
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install lint tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cppcheck shellcheck
+          pipx install ruff
+
+      - name: shellcheck
+        run: shellcheck firmware/*.sh
+
+      - name: ruff
+        run: ruff check firmware/tools/
+
+      - name: cppcheck
+        run: |
+          cppcheck --enable=warning,performance,portability \
+            --error-exitcode=1 --inline-suppr \
+            -I firmware/components/pca9685/include \
+            -I firmware/components/motor/include \
+            firmware/components firmware/main

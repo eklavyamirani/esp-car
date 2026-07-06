@@ -49,47 +49,8 @@ Workflow hygiene:
   the build.
 - Make this job a **required status check** on `main` via branch protection.
 
-Example workflow (`.github/workflows/build.yml`):
-
-```yaml
-name: build
-on:
-  push:
-    branches: [main]
-    paths: ['firmware/**', '.github/workflows/build.yml']
-  pull_request:
-    paths: ['firmware/**', '.github/workflows/build.yml']
-
-concurrency:
-  group: build-${{ github.ref }}
-  cancel-in-progress: true
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    container: espressif/idf:v5.4
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/cache@v4
-        with:
-          path: ~/.ccache
-          key: ccache-idf5.4-${{ github.sha }}
-          restore-keys: ccache-idf5.4-
-      - name: Build firmware
-        run: |
-          . $IDF_PATH/export.sh
-          cd firmware
-          idf.py build
-          idf.py size-components >> $GITHUB_STEP_SUMMARY
-      - uses: actions/upload-artifact@v4
-        with:
-          name: firmware
-          path: |
-            firmware/build/esp-car.bin
-            firmware/build/esp-car.elf
-            firmware/build/*.map
-          retention-days: 7
-```
+Implemented in `.github/workflows/ci.yml` (jobs `build` and `lint`), pinned to
+`espressif/idf:v5.4.4`.
 
 ### Stage 2 — Static checks (cheap, add alongside Stage 1)
 
