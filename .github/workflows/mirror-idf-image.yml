@@ -1,0 +1,32 @@
+name: mirror-idf-image
+
+# Mirrors the pinned espressif/idf image to GHCR so CI pulls it over
+# GitHub's internal network instead of Docker Hub.
+#
+# To bump the IDF version: update IDF_VERSION here, let this workflow run
+# (push or manual dispatch), then update the container image tag in ci.yml.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'claude/**']
+    paths: ['.github/workflows/mirror-idf-image.yml']
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IDF_VERSION: v5.4.4
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mirror espressif/idf to GHCR
+        run: |
+          command -v skopeo >/dev/null || { sudo apt-get update && sudo apt-get install -y skopeo; }
+          skopeo copy \
+            --dest-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" \
+            "docker://docker.io/espressif/idf:${IDF_VERSION}" \
+            "docker://ghcr.io/${{ github.repository }}/idf:${IDF_VERSION}"
