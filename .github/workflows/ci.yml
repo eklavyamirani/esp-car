@@ -15,6 +15,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -24,7 +25,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: espressif/idf:v5.4.4
+      # GHCR mirror of espressif/idf:v5.4.4 (see mirror-idf-image.yml) —
+      # pulls over GitHub's network are faster than Docker Hub
+      image: ghcr.io/${{ github.repository }}/idf:v5.4.4
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       IDF_CCACHE_ENABLE: '1'

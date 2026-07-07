@@ -50,7 +50,11 @@ Workflow hygiene:
 - Make this job a **required status check** on `main` via branch protection.
 
 Implemented in `.github/workflows/ci.yml` (jobs `build` and `lint`), pinned to
-`espressif/idf:v5.4.4`.
+`espressif/idf:v5.4.4`. The image is mirrored to GHCR
+(`.github/workflows/mirror-idf-image.yml`) so the build job pulls it over
+GitHub's internal network instead of Docker Hub. To bump the IDF version:
+update `IDF_VERSION` in the mirror workflow, let it run, then update the
+image tag in `ci.yml`.
 
 ### Stage 2 — Static checks (cheap, add alongside Stage 1)
 
