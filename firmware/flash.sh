@@ -6,6 +6,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PORT="${1:-/dev/ttyUSB0}"
 
+# shellcheck disable=SC1091  # export.sh only exists after installing ESP-IDF
 source /opt/esp-idf/export.sh 2>/dev/null
 
 cd "$SCRIPT_DIR"

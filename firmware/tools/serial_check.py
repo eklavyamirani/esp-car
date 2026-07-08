@@ -73,8 +73,8 @@ def main():
         print(f"   Missing: {missing}")
         print()
         print("--- Captured output ---")
-        for l in captured:
-            print(l)
+        for captured_line in captured:
+            print(captured_line)
         return 1
 
 if __name__ == "__main__":
