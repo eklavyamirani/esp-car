@@ -68,7 +68,9 @@ A separate fast job, not gated on the toolchain image:
 - **shellcheck** for `flash.sh` / `test.sh`.
 - **ruff** for `tools/serial_check.py` and future Python tooling.
 
-All advisory at first (non-required), promoted to required once the tree is clean.
+Implemented in the `lint` job of `.github/workflows/ci.yml` (shellcheck, ruff,
+clang-format, cppcheck), config in `.clang-format`. The tree is clean, so this
+can be marked required in branch protection alongside `build`.
 
 ### Stage 3 — Host-side unit tests (highest engineering value)
 

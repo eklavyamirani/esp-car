@@ -7,15 +7,15 @@
 static const char *TAG = "PCA9685";
 
 // PCA9685 register addresses
-#define PCA9685_REG_MODE1       0x00
-#define PCA9685_REG_MODE2       0x01
-#define PCA9685_REG_LED0_ON_L   0x06
-#define PCA9685_REG_PRE_SCALE   0xFE
+#define PCA9685_REG_MODE1 0x00
+#define PCA9685_REG_MODE2 0x01
+#define PCA9685_REG_LED0_ON_L 0x06
+#define PCA9685_REG_PRE_SCALE 0xFE
 
 // MODE1 bits
-#define MODE1_RESTART   (1 << 7)
-#define MODE1_SLEEP     (1 << 4)
-#define MODE1_AI        (1 << 5)  // auto-increment
+#define MODE1_RESTART (1 << 7)
+#define MODE1_SLEEP (1 << 4)
+#define MODE1_AI (1 << 5) // auto-increment
 
 // Each LED channel has 4 registers: ON_L, ON_H, OFF_L, OFF_H
 #define LED_REG(channel) (PCA9685_REG_LED0_ON_L + 4 * (channel))
@@ -93,7 +93,8 @@ esp_err_t pca9685_init(const pca9685_config_t *cfg, pca9685_handle_t *handle)
         return err;
     }
 
-    ESP_LOGI(TAG, "I2C bus initialized on port %d (SDA=%d, SCL=%d)", cfg->i2c_port, cfg->sda_gpio, cfg->scl_gpio);
+    ESP_LOGI(TAG, "I2C bus initialized on port %d (SDA=%d, SCL=%d)", cfg->i2c_port, cfg->sda_gpio,
+             cfg->scl_gpio);
 
     // Reset: write MODE1 to sleep
     err = pca9685_write_reg(handle, PCA9685_REG_MODE1, MODE1_SLEEP);
@@ -151,10 +152,10 @@ esp_err_t pca9685_set_channel_pwm(pca9685_handle_t *handle, uint8_t channel, uin
     // ON at tick 0, OFF at tick `pwm`
     uint8_t buf[5] = {
         reg,
-        0x00,                   // ON_L
-        0x00,                   // ON_H
-        (uint8_t)(pwm & 0xFF),  // OFF_L
-        (uint8_t)(pwm >> 8),    // OFF_H
+        0x00,                  // ON_L
+        0x00,                  // ON_H
+        (uint8_t)(pwm & 0xFF), // OFF_L
+        (uint8_t)(pwm >> 8),   // OFF_H
     };
     return pca9685_write_buf(handle, buf, sizeof(buf));
 }
@@ -167,10 +168,10 @@ esp_err_t pca9685_set_channel_off(pca9685_handle_t *handle, uint8_t channel)
     // Full OFF: set bit 4 in OFF_H
     uint8_t buf[5] = {
         reg,
-        0x00,           // ON_L
-        0x00,           // ON_H
-        0x00,           // OFF_L
-        0x10,           // OFF_H (bit 4 = full off)
+        0x00, // ON_L
+        0x00, // ON_H
+        0x00, // OFF_L
+        0x10, // OFF_H (bit 4 = full off)
     };
     return pca9685_write_buf(handle, buf, sizeof(buf));
 }

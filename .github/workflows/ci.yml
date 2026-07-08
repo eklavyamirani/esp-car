@@ -76,7 +76,7 @@ jobs:
       - name: Install lint tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends cppcheck shellcheck
+          sudo apt-get install -y --no-install-recommends cppcheck shellcheck clang-format
           pipx install ruff
 
       - name: shellcheck
@@ -84,6 +84,11 @@ jobs:
 
       - name: ruff
         run: ruff check firmware/tools/
+
+      - name: clang-format
+        run: |
+          find firmware/components firmware/main \( -name '*.c' -o -name '*.h' \) \
+            | xargs clang-format --dry-run --Werror
 
       - name: cppcheck
         run: |
